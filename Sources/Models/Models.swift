@@ -81,7 +81,7 @@ final class FoodEntry {
     var protein: Double
     var carbs: Double
     var fat: Double
-    var source: String   // "barcode", "search", "ai"
+    var source: String   // "barcode", "search", "ai", "recipe"
 
     init(date: Date, meal: MealType, name: String, brand: String?, grams: Double,
          macros: Macros, source: String) {
@@ -111,4 +111,93 @@ func entryTimestamp(for day: Date) -> Date {
     let cal = Calendar.current
     if cal.isDateInToday(day) { return Date() }
     return cal.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
+}
+
+// MARK: - Recetas / comidas recurrentes
+
+/// Ingrediente de una receta. Guarda los macros TOTALES para los gramos indicados.
+struct RecipeItem: Codable, Hashable, Identifiable {
+    var id: UUID
+    var name: String
+    var brand: String?
+    var grams: Double
+    var kcal: Double
+    var protein: Double
+    var carbs: Double
+    var fat: Double
+
+    init(name: String, brand: String?, grams: Double, macros: Macros) {
+        self.id = UUID()
+        self.name = name
+        self.brand = brand
+        self.grams = grams
+        self.kcal = macros.kcal
+        self.protein = macros.protein
+        self.carbs = macros.carbs
+        self.fat = macros.fat
+    }
+
+    var macros: Macros { Macros(kcal: kcal, protein: protein, carbs: carbs, fat: fat) }
+
+    /// Cambia los gramos escalando los macros proporcionalmente.
+    mutating func rescale(to newGrams: Double) {
+        guard grams > 0, newGrams > 0 else { grams = max(newGrams, 0); return }
+        let f = newGrams / grams
+        kcal *= f; protein *= f; carbs *= f; fat *= f
+        grams = newGrams
+    }
+}
+
+/// Receta guardada. Si tiene `weekdays`, se repite esos días de la semana.
+@Model
+final class Recipe {
+    var id: UUID
+    var name: String
+    var mealRaw: String
+    var items: [RecipeItem]
+    var weekdays: [Int]          // Calendar.weekday: 1 = domingo … 7 = sábado
+    var autoAdd: Bool            // true: se añade sola al diario; false: aparece como pendiente
+    var lastAppliedDay: Date?    // último día en que se añadió/omitió (evita duplicados)
+    var createdAt: Date
+
+    init(name: String, meal: MealType, items: [RecipeItem], weekdays: [Int], autoAdd: Bool) {
+        self.id = UUID()
+        self.name = name
+        self.mealRaw = meal.rawValue
+        self.items = items
+        self.weekdays = weekdays
+        self.autoAdd = autoAdd
+        self.lastAppliedDay = nil
+        self.createdAt = Date()
+    }
+
+    var meal: MealType {
+        get { MealType(rawValue: mealRaw) ?? .lunch }
+        set { mealRaw = newValue.rawValue }
+    }
+
+    var total: Macros { items.reduce(.zero) { $0 + $1.macros } }
+}
+
+enum Weekday {
+    /// Orden español: lunes primero (valores de Calendar.weekday).
+    static let ordered = [2, 3, 4, 5, 6, 7, 1]
+    static let weekdays = Set([2, 3, 4, 5, 6])
+    static let weekend = Set([7, 1])
+
+    static func short(_ d: Int) -> String { ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][d - 1] }
+    static func initial(_ d: Int) -> String { ["D", "L", "M", "X", "J", "V", "S"][d - 1] }
+
+    static func summary(_ days: [Int]) -> String {
+        let set = Set(days)
+        if set.isEmpty { return "Sin repetición" }
+        if set.count == 7 { return "Todos los días" }
+        if set == weekdays { return "Lunes a viernes" }
+        if set == weekend { return "Fines de semana" }
+        return ordered.filter(set.contains).map(short).joined(separator: ", ")
+    }
+}
+
+func parseNumber(_ s: String) -> Double {
+    Double(s.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)) ?? 0
 }
