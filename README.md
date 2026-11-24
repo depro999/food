@@ -8,6 +8,7 @@
 - 🔎 Búsqueda por nombre/marca y entrada manual de código.
 - ✨ Foto del plato → la IA (Claude, visión) detecta alimentos, estima gramos y macros; puedes ajustar gramos.
 - 📊 Diario por comidas, anillo de calorías, barras de macros, historial de 7 días (Swift Charts).
+- 🔁 **Recetas y comidas recurrentes**: guarda una receta (varios alimentos) y repítela los días que quieras (lunes, martes, L–V…). Se añade sola al diario o aparece como pendiente en «Hoy». También puedes guardar una comida del diario como receta desde el menú ⋯ de cada comida.
 - 🎯 Objetivos personalizables. Datos guardados en el dispositivo con SwiftData.
 
 ## Cómo abrirlo en Xcode
@@ -46,5 +47,6 @@ Sources/
 ├─ Services/OpenFoodFactsService.swift (búsqueda + código de barras)
 ├─ Services/AIFoodRecognizer.swift     (foto → macros con IA)
 ├─ Services/KeychainStore.swift
-└─ Views/ (Today, AddFood, FoodDetail, BarcodeScanner, PhotoAnalysis, History, Settings)
+├─ Services/RecipeScheduler.swift      (aplica las recetas recurrentes)
+└─ Views/ (Recipes, Today, AddFood, FoodDetail, BarcodeScanner, PhotoAnalysis, History, Settings)
 ```
