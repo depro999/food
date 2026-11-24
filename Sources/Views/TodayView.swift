@@ -65,6 +65,9 @@ struct DayContent: View {
     @AppStorage("goalFat") private var goalFat = 70.0
 
     @Query private var entries: [FoodEntry]
+    @Query(sort: \Recipe.name) private var recipes: [Recipe]
+    @State private var draft: RecipeDraft?
+    let date: Date
     let onAdd: (MealType) -> Void
 
     init(date: Date, onAdd: @escaping (MealType) -> Void) {
@@ -72,7 +75,14 @@ struct DayContent: View {
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start) ?? start
         _entries = Query(filter: #Predicate<FoodEntry> { $0.date >= start && $0.date < end },
                          sort: \.date)
+        self.date = date
         self.onAdd = onAdd
+    }
+
+    /// Recetas recurrentes de hoy que no se añaden solas y siguen pendientes.
+    private var pending: [Recipe] {
+        guard Calendar.current.isDateInToday(date) else { return [] }
+        return recipes.filter { !$0.autoAdd && !$0.items.isEmpty && RecipeScheduler.isDue($0, on: date) }
     }
 
     private var total: Macros { entries.reduce(.zero) { $0 + $1.macros } }
@@ -84,6 +94,30 @@ struct DayContent: View {
                             goalCarbs: goalCarbs, goalFat: goalFat)
             }
 
+            if !pending.isEmpty {
+                Section("Planificado para hoy") {
+                    ForEach(pending) { r in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label(r.name, systemImage: r.meal.icon).lineLimit(1)
+                                Text("\(r.meal.title) · \(fmt(r.total.kcal)) kcal")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Añadir") {
+                                RecipeScheduler.add(r, to: date, context: context)
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
+                        .swipeActions {
+                            Button("Omitir") { RecipeScheduler.skipToday(r) }.tint(.gray)
+                        }
+                    }
+                }
+            }
+
             ForEach(MealType.allCases) { meal in
                 let items = entries.filter { $0.meal == meal }
                 Section {
@@ -93,6 +127,8 @@ struct DayContent: View {
                                 Text(e.name).lineLimit(1)
                                 if e.source == "ai" {
                                     Image(systemName: "sparkles").font(.caption).foregroundStyle(.purple)
+                                } else if e.source == "recipe" {
+                                    Image(systemName: "repeat").font(.caption).foregroundStyle(.green)
                                 }
                                 Spacer()
                                 Text("\(fmt(e.kcal)) kcal").monospacedDigit()
@@ -112,10 +148,22 @@ struct DayContent: View {
                         Label(meal.title, systemImage: meal.icon)
                         Spacer()
                         Text("\(fmt(items.reduce(0) { $0 + $1.kcal })) kcal")
+                        if !items.isEmpty {
+                            Menu {
+                                Button {
+                                    draft = RecipeDraft(meal: meal, items: items.map {
+                                        RecipeItem(name: $0.name, brand: $0.brand, grams: $0.grams, macros: $0.macros)
+                                    })
+                                } label: { Label("Guardar como receta / repetir", systemImage: "repeat") }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                            }
+                        }
                     }
                 }
             }
         }
+        .sheet(item: $draft) { RecipeEditorView(meal: $0.meal, items: $0.items) }
     }
 }
 
