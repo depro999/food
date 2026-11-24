@@ -24,7 +24,18 @@ jobs:
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             INFOPLIST_KEY_CFBundleDisplayName="Consilium" 2>&1 | tee build.log
+
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -n 1)
+
+          echo "=== 1. ARCHIVOS DENTRO DEL .APP ==="
+          ls -la "$APP"
+
+          echo "=== 2. CLAVES DE ICONO EN INFO.PLIST ==="
+          plutil -p "$APP/Info.plist" | grep -A 15 "CFBundleIcons" || echo "NO HAY CFBundleIcons"
+
+          echo "=== 3. LOG DE ACTOOL ==="
+          grep -i -E "actool|AppIcon|Assets.xcassets" build.log || echo "NO SE EJECUTO ACTOOL"
+
           mkdir Payload
           ditto "$APP" "Payload/$(basename "$APP")"
           zip -ry App.ipa Payload
