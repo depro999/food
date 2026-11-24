@@ -7,6 +7,6 @@ struct MacroTrackerApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: FoodEntry.self)
+        .modelContainer(for: [FoodEntry.self, Recipe.self])
     }
 }
