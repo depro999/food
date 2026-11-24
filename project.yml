@@ -1,0 +1,22 @@
+name: MacroTracker
+options:
+  bundleIdPrefix: com.tuempresa
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  MacroTracker:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Macros
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCameraUsageDescription: Necesitamos la cámara para escanear códigos de barras/QR y fotografiar tus comidas.
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        PRODUCT_BUNDLE_IDENTIFIER: com.tuempresa.MacroTracker
+        TARGETED_DEVICE_FAMILY: "1"
