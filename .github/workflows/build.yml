@@ -6,6 +6,7 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+
       - name: Generar proyecto Xcode con XcodeGen
         run: |
           brew install xcodegen
@@ -25,8 +26,8 @@ jobs:
             INFOPLIST_KEY_CFBundleDisplayName="Consilium" 2>&1 | tee build.log
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -n 1)
           mkdir Payload
-          cp -R "$APP" Payload/
-          zip -r App.ipa Payload
+          ditto "$APP" "Payload/$(basename "$APP")"
+          zip -ry App.ipa Payload
 
       - name: Mostrar errores
         if: failure()
