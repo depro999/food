@@ -6,6 +6,10 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - name: Generar proyecto Xcode con XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen generate
 
       - name: Compilar
         run: |
