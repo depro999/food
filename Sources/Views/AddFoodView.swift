@@ -1,10 +1,13 @@
 import SwiftUI
+import SwiftData
 
 struct AddFoodView: View {
     let date: Date
     let meal: MealType
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query(sort: \Recipe.name) private var recipes: [Recipe]
     @State private var path: [FoodItem] = []
     @State private var query = ""
     @State private var results: [FoodItem] = []
@@ -31,6 +34,30 @@ struct AddFoodView: View {
                             .keyboardType(.numberPad)
                         Button("Buscar") { Task { await lookup(manualCode) } }
                             .disabled(manualCode.count < 8)
+                    }
+                }
+
+                if !recipes.isEmpty {
+                    Section("Mis recetas") {
+                        ForEach(recipes.filter { !$0.items.isEmpty }) { r in
+                            Button {
+                                RecipeScheduler.add(r, to: date, meal: meal, context: context)
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(r.name)
+                                        Text(Weekday.summary(r.weekdays))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text("\(fmt(r.total.kcal)) kcal")
+                                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        }
                     }
                 }
 
