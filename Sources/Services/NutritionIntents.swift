@@ -29,21 +29,47 @@ enum NutrientOption: String, AppEnum {
     case caffeine
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Nutriente"
-    static let caseDisplayRepresentations: [NutrientOption: DisplayRepresentation] = {
-        var d: [NutrientOption: DisplayRepresentation] = [
-            .calories: "Calorías (kcal)",
-            .protein: "Proteína (g)",
-            .carbs: "Carbohidratos (g)",
-            .fat: "Grasas (g)"
-        ]
-        for n in Nutrient.allCases {
-            if let o = NutrientOption(rawValue: n.rawValue) {
-                d[o] = DisplayRepresentation(
-                    title: LocalizedStringResource(stringLiteral: "\(n.title) (\(n.unit.symbol))"))
-            }
-        }
-        return d
-    }()
+    // Debe ser un diccionario literal: App Intents lo lee en tiempo de compilación.
+    static let caseDisplayRepresentations: [NutrientOption: DisplayRepresentation] = [
+        .calories: "Calorías (kcal)",
+        .protein: "Proteína (g)",
+        .carbs: "Carbohidratos (g)",
+        .fat: "Grasas (g)",
+        .fiber: "Fibra (g)",
+        .sugars: "Azúcares (g)",
+        .saturatedFat: "Grasa saturada (g)",
+        .monounsaturatedFat: "Grasa monoinsaturada (g)",
+        .polyunsaturatedFat: "Grasa poliinsaturada (g)",
+        .cholesterol: "Colesterol (mg)",
+        .sodium: "Sodio (mg)",
+        .potassium: "Potasio (mg)",
+        .calcium: "Calcio (mg)",
+        .iron: "Hierro (mg)",
+        .magnesium: "Magnesio (mg)",
+        .zinc: "Zinc (mg)",
+        .phosphorus: "Fósforo (mg)",
+        .copper: "Cobre (mg)",
+        .manganese: "Manganeso (mg)",
+        .selenium: "Selenio (µg)",
+        .iodine: "Yodo (µg)",
+        .chromium: "Cromo (µg)",
+        .molybdenum: "Molibdeno (µg)",
+        .chloride: "Cloruro (mg)",
+        .vitaminA: "Vitamina A (µg)",
+        .vitaminC: "Vitamina C (mg)",
+        .vitaminD: "Vitamina D (µg)",
+        .vitaminE: "Vitamina E (mg)",
+        .vitaminK: "Vitamina K (µg)",
+        .thiamin: "B1 tiamina (mg)",
+        .riboflavin: "B2 riboflavina (mg)",
+        .niacin: "B3 niacina (mg)",
+        .vitaminB6: "Vitamina B6 (mg)",
+        .folate: "B9 folato (µg)",
+        .vitaminB12: "Vitamina B12 (µg)",
+        .biotin: "Biotina (µg)",
+        .pantothenicAcid: "B5 ácido pantoténico (mg)",
+        .caffeine: "Cafeína (mg)"
+    ]
 }
 
 // MARK: - Lógica compartida
