@@ -1,3 +1,4 @@
+#if HEALTHKIT
 import Foundation
 import HealthKit
 
@@ -90,3 +91,21 @@ final class HealthSync {
         return samples
     }
 }
+
+#else
+import Foundation
+
+/// Versión sin HealthKit (compilaciones sin cuenta de Apple Developer de pago).
+/// Para activar Apple Salud, añade HEALTHKIT a "Active Compilation Conditions" y firma con HealthKit.
+@MainActor
+final class HealthSync {
+    static let shared = HealthSync()
+    static var isAvailable: Bool { false }
+
+    func requestAuthorization() async -> String? {
+        "Apple Salud no está disponible en esta compilación."
+    }
+    func sync(_ entries: [FoodEntry]) async {}
+    func delete(_ entry: FoodEntry) {}
+}
+#endif
