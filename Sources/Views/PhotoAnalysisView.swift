@@ -17,6 +17,7 @@ struct PhotoAnalysisView: View {
     @State private var hint = ""
     @State private var foods: [DetectedFood] = []
     @State private var notes: String?
+    @State private var analysisInfo: String?
     @State private var isAnalyzing = false
     @State private var errorMessage: String?
     @State private var showCamera = false
@@ -105,6 +106,9 @@ struct PhotoAnalysisView: View {
                         if let notes, !notes.isEmpty {
                             Text(notes).font(.footnote).foregroundStyle(.secondary)
                         }
+                        if let analysisInfo {
+                            Text(analysisInfo).font(.footnote).foregroundStyle(.secondary)
+                        }
                         Text("Son estimaciones: ajusta los gramos si conoces el peso real.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
@@ -154,11 +158,15 @@ struct PhotoAnalysisView: View {
         guard let image else { return }
         isAnalyzing = true
         errorMessage = nil
+        analysisInfo = nil
         defer { isAnalyzing = false }
         do {
             let result = try await AIFoodRecognizer().analyze(image: image, hint: hint)
             foods = result.foods
             notes = result.notes
+            var info = "Analizado con \(result.provider?.title ?? "IA")"
+            if !result.skipped.isEmpty { info += ". Se saltó: " + result.skipped.joined(separator: ", ") }
+            analysisInfo = info
             if foods.isEmpty { errorMessage = result.notes ?? "No se detectó comida en la imagen." }
         } catch {
             errorMessage = error.localizedDescription
