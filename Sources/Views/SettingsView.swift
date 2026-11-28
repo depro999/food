@@ -48,6 +48,11 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Guardar en Apple Salud", isOn: $healthSync)
+                        .disabled(!HealthSync.isAvailable)
+                    if !HealthSync.isAvailable {
+                        Text("No disponible en esta compilación: Apple Salud exige firmar la app con la capacidad HealthKit (cuenta de Apple Developer de pago).")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     if let healthMessage {
                         Text(healthMessage).font(.footnote).foregroundStyle(.red)
                     }
@@ -64,7 +69,10 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Ajustes")
-            .onAppear { apiKey = Keychain.get(AIFoodRecognizer.keychainKey) ?? "" }
+            .onAppear {
+                apiKey = Keychain.get(AIFoodRecognizer.keychainKey) ?? ""
+                if !HealthSync.isAvailable { healthSync = false }
+            }
             .onChange(of: apiKey) { _, _ in saved = false }
             .onChange(of: healthSync) { _, on in
                 guard on else { healthMessage = nil; return }
