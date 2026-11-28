@@ -59,6 +59,11 @@ struct FoodItem: Identifiable, Hashable {
     var servingGrams: Double?
     var barcode: String?
     var imageURL: URL?
+    var microsPer100: Micros = [:]   // gramos por 100 g
+
+    func micros(for grams: Double) -> Micros {
+        microsPer100.mapValues { $0 * grams / 100 }
+    }
 
     func macros(for grams: Double) -> Macros {
         let f = grams / 100
@@ -82,9 +87,11 @@ final class FoodEntry {
     var carbs: Double
     var fat: Double
     var source: String   // "barcode", "search", "ai", "recipe"
+    var microsData: Data?            // micronutrientes (JSON, en gramos)
+    var healthSynced: Bool = false   // ya enviado a Apple Salud
 
     init(date: Date, meal: MealType, name: String, brand: String?, grams: Double,
-         macros: Macros, source: String) {
+         macros: Macros, source: String, micros: Micros = [:]) {
         self.id = UUID()
         self.date = date
         self.mealRaw = meal.rawValue
@@ -96,6 +103,8 @@ final class FoodEntry {
         self.carbs = macros.carbs
         self.fat = macros.fat
         self.source = source
+        self.microsData = micros.isEmpty ? nil : try? JSONEncoder().encode(micros)
+        self.healthSynced = false
     }
 
     var meal: MealType {
@@ -104,6 +113,10 @@ final class FoodEntry {
     }
 
     var macros: Macros { Macros(kcal: kcal, protein: protein, carbs: carbs, fat: fat) }
+
+    var micros: Micros {
+        microsData.flatMap { try? JSONDecoder().decode(Micros.self, from: $0) } ?? [:]
+    }
 }
 
 /// Fecha con la que se guarda un registro al añadirlo a un día concreto.
@@ -125,8 +138,9 @@ struct RecipeItem: Codable, Hashable, Identifiable {
     var protein: Double
     var carbs: Double
     var fat: Double
+    var microsData: Data?
 
-    init(name: String, brand: String?, grams: Double, macros: Macros) {
+    init(name: String, brand: String?, grams: Double, macros: Macros, micros: Micros = [:]) {
         self.id = UUID()
         self.name = name
         self.brand = brand
@@ -135,15 +149,22 @@ struct RecipeItem: Codable, Hashable, Identifiable {
         self.protein = macros.protein
         self.carbs = macros.carbs
         self.fat = macros.fat
+        self.microsData = micros.isEmpty ? nil : try? JSONEncoder().encode(micros)
     }
 
     var macros: Macros { Macros(kcal: kcal, protein: protein, carbs: carbs, fat: fat) }
+
+    var micros: Micros {
+        get { microsData.flatMap { try? JSONDecoder().decode(Micros.self, from: $0) } ?? [:] }
+        set { microsData = newValue.isEmpty ? nil : try? JSONEncoder().encode(newValue) }
+    }
 
     /// Cambia los gramos escalando los macros proporcionalmente.
     mutating func rescale(to newGrams: Double) {
         guard grams > 0, newGrams > 0 else { grams = max(newGrams, 0); return }
         let f = newGrams / grams
         kcal *= f; protein *= f; carbs *= f; fat *= f
+        micros = micros.mapValues { $0 * f }
         grams = newGrams
     }
 }
