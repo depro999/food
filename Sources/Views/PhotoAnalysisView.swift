@@ -6,6 +6,8 @@ struct PhotoAnalysisView: View {
     let date: Date
     let meal: MealType
     let onSaved: () -> Void
+    /// Si no es nil, los alimentos se devuelven a una receta en vez de guardarse en el diario.
+    let onPickItems: (([RecipeItem]) -> Void)?
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -20,10 +22,12 @@ struct PhotoAnalysisView: View {
     @State private var showCamera = false
     @State private var selectedMeal: MealType
 
-    init(date: Date, meal: MealType, onSaved: @escaping () -> Void) {
+    init(date: Date, meal: MealType, onSaved: @escaping () -> Void,
+         onPickItems: (([RecipeItem]) -> Void)? = nil) {
         self.date = date
         self.meal = meal
         self.onSaved = onSaved
+        self.onPickItems = onPickItems
         _selectedMeal = State(initialValue: meal)
     }
 
@@ -106,13 +110,16 @@ struct PhotoAnalysisView: View {
                     }
 
                     Section {
-                        Picker("Comida", selection: $selectedMeal) {
-                            ForEach(MealType.allCases) { Text($0.title).tag($0) }
+                        if onPickItems == nil {
+                            Picker("Comida", selection: $selectedMeal) {
+                                ForEach(MealType.allCases) { Text($0.title).tag($0) }
+                            }
                         }
                         Button {
                             save()
                         } label: {
-                            Text("Añadir al diario").frame(maxWidth: .infinity).bold()
+                            Text(onPickItems == nil ? "Añadir al diario" : "Añadir a la receta")
+                                .frame(maxWidth: .infinity).bold()
                         }
                         .disabled(total.kcal <= 0)
                     }
@@ -159,10 +166,17 @@ struct PhotoAnalysisView: View {
     }
 
     private func save() {
-        for f in foods where f.isSelected {
-            context.insert(FoodEntry(date: entryTimestamp(for: date), meal: selectedMeal,
-                                     name: f.name, brand: nil, grams: f.grams,
-                                     macros: f.macros, source: "ai"))
+        let selected = foods.filter(\.isSelected)
+        if let onPickItems {
+            onPickItems(selected.map {
+                RecipeItem(name: $0.name, brand: nil, grams: $0.grams, macros: $0.macros, micros: $0.micros)
+            })
+        } else {
+            for f in selected {
+                context.insert(FoodEntry(date: entryTimestamp(for: date), meal: selectedMeal,
+                                         name: f.name, brand: nil, grams: f.grams,
+                                         macros: f.macros, source: "ai", micros: f.micros))
+            }
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         onSaved()
