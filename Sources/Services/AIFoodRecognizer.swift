@@ -9,11 +9,17 @@ struct DetectedFood: Identifiable {
     var baseMacros: Macros
     var grams: Double
     var isSelected = true
+    var baseMicros: Micros = [:]   // gramos, para baseGrams
 
     var macros: Macros {
         let f = baseGrams > 0 ? grams / baseGrams : 0
         return Macros(kcal: baseMacros.kcal * f, protein: baseMacros.protein * f,
                       carbs: baseMacros.carbs * f, fat: baseMacros.fat * f)
+    }
+
+    var micros: Micros {
+        let f = baseGrams > 0 ? grams / baseGrams : 0
+        return baseMicros.mapValues { $0 * f }
     }
 }
 
@@ -52,19 +58,25 @@ struct AIFoodRecognizer {
             let protein_g: Double
             let carbs_g: Double
             let fat_g: Double
+            let micros: [String: FlexDouble]?
         }
         let foods: [Item]
         let notes: String?
     }
 
-    private let system = """
-    Eres un nutricionista experto en estimar el contenido nutricional de platos a partir de fotos. \
-    Identifica cada alimento visible, estima su peso en gramos (cocinado/tal como se ve) y sus macros \
-    TOTALES para esa porción. Usa un plato o cubiertos como referencia de tamaño. \
-    Responde ÚNICAMENTE con JSON válido, sin texto adicional ni markdown, con este formato exacto: \
-    {"foods":[{"name":"string en español","grams":number,"kcal":number,"protein_g":number,"carbs_g":number,"fat_g":number}],"notes":"string opcional con aclaraciones o nivel de incertidumbre"}. \
-    Si no hay comida en la imagen devuelve {"foods":[],"notes":"No veo comida en la imagen"}.
-    """
+    private var system: String {
+        let keys = Nutrient.allCases.map { "\($0.rawValue) (\($0.unit.symbol))" }.joined(separator: ", ")
+        return """
+        Eres un nutricionista experto en estimar el contenido nutricional de platos a partir de fotos. \
+        Identifica cada alimento visible, estima su peso en gramos (cocinado/tal como se ve) y sus macros \
+        TOTALES para esa porción. Usa un plato o cubiertos como referencia de tamaño. \
+        Responde ÚNICAMENTE con JSON válido, sin texto adicional ni markdown, con este formato exacto: \
+        {"foods":[{"name":"string en español","grams":number,"kcal":number,"protein_g":number,"carbs_g":number,"fat_g":number,"micros":{"clave":number}}],"notes":"string opcional con aclaraciones o nivel de incertidumbre"}. \
+        En "micros" estima los micronutrientes TOTALES de esa porción usando SOLO estas claves y estas unidades: \(keys). \
+        Incluye únicamente los que tengan un valor apreciable y omite el resto. \
+        Si no hay comida en la imagen devuelve {"foods":[],"notes":"No veo comida en la imagen"}.
+        """
+    }
 
     func analyze(image: UIImage, hint: String = "") async throws -> AIAnalysis {
         guard let key = Keychain.get(Self.keychainKey), !key.isEmpty else { throw AIError.missingKey }
@@ -79,7 +91,7 @@ struct AIFoodRecognizer {
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 1024,
+            "max_tokens": 4096,
             "system": system,
             "messages": [[
                 "role": "user",
@@ -112,11 +124,17 @@ struct AIFoodRecognizer {
               let dto = try? JSONDecoder().decode(DTO.self, from: Data(text[start...end].utf8))
         else { throw AIError.parse }
 
-        let foods = dto.foods.map {
-            DetectedFood(name: $0.name, baseGrams: max($0.grams, 1),
-                         baseMacros: Macros(kcal: $0.kcal, protein: $0.protein_g,
-                                            carbs: $0.carbs_g, fat: $0.fat_g),
-                         grams: max($0.grams, 1))
+        let foods = dto.foods.map { item -> DetectedFood in
+            var micros: Micros = [:]
+            for (k, v) in item.micros ?? [:] {
+                if let n = Nutrient(rawValue: k), let x = v.value, x > 0 {
+                    micros[k] = x * n.unit.gramsPerUnit
+                }
+            }
+            return DetectedFood(name: item.name, baseGrams: max(item.grams, 1),
+                                baseMacros: Macros(kcal: item.kcal, protein: item.protein_g,
+                                                   carbs: item.carbs_g, fat: item.fat_g),
+                                grams: max(item.grams, 1), baseMicros: micros)
         }
         return AIAnalysis(foods: foods, notes: dto.notes)
     }
