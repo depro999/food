@@ -15,7 +15,8 @@ enum RecipeScheduler {
         let stamp = entryTimestamp(for: day)
         for it in r.items {
             context.insert(FoodEntry(date: stamp, meal: meal ?? r.meal, name: it.name, brand: it.brand,
-                                     grams: it.grams, macros: it.macros, source: "recipe"))
+                                     grams: it.grams, macros: it.macros, source: "recipe",
+                                     micros: it.micros))
         }
         if Calendar.current.isDateInToday(day) { r.lastAppliedDay = Date() }
     }
