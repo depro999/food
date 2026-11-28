@@ -188,7 +188,7 @@ struct RecipeEditorView: View {
                 }
             }
             .sheet(isPresented: $showPicker) {
-                RecipeItemPicker { items.append($0) }
+                AddFoodView(date: Date(), meal: meal, onPick: { items.append(contentsOf: $0) })
             }
         }
     }
@@ -215,112 +215,9 @@ struct RecipeEditorView: View {
     }
 }
 
-// MARK: - Selector de ingredientes
+// MARK: - Alta manual de ingrediente
 
-struct RecipeItemPicker: View {
-    let onPick: (RecipeItem) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-    @State private var results: [FoodItem] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-
-    private let service = OpenFoodFactsService()
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    NavigationLink {
-                        ManualItemForm { onPick($0); dismiss() }
-                    } label: {
-                        Label("Añadir manualmente", systemImage: "square.and.pencil")
-                    }
-                }
-                Section("Resultados") {
-                    if isLoading {
-                        HStack { Spacer(); ProgressView(); Spacer() }
-                    } else if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red)
-                    } else if results.isEmpty {
-                        Text(query.isEmpty ? "Busca un alimento por nombre o marca." : "Sin resultados.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(results) { item in
-                        NavigationLink {
-                            ItemGramsView(food: item) { onPick($0); dismiss() }
-                        } label: { FoodRow(item: item) }
-                    }
-                }
-            }
-            .navigationTitle("Añadir ingrediente")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: "Buscar alimento")
-            .onSubmit(of: .search) { Task { await search() } }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cerrar") { dismiss() } }
-            }
-        }
-    }
-
-    private func search() async {
-        let q = query.trimmingCharacters(in: .whitespaces)
-        guard q.count >= 2 else { return }
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        do { results = try await service.search(q) }
-        catch { errorMessage = "No se pudo conectar con la base de datos. Revisa tu conexión." }
-    }
-}
-
-private struct ItemGramsView: View {
-    let food: FoodItem
-    let onAdd: (RecipeItem) -> Void
-    @State private var gramsText: String
-
-    init(food: FoodItem, onAdd: @escaping (RecipeItem) -> Void) {
-        self.food = food
-        self.onAdd = onAdd
-        _gramsText = State(initialValue: fmt(food.servingGrams ?? 100))
-    }
-
-    private var grams: Double { parseNumber(gramsText) }
-    private var macros: Macros { food.macros(for: grams) }
-
-    var body: some View {
-        Form {
-            Section {
-                Text(food.name).font(.headline)
-                if let b = food.brand, !b.isEmpty { Text(b).foregroundStyle(.secondary) }
-            }
-            Section("Cantidad") {
-                HStack {
-                    TextField("Gramos", text: $gramsText).keyboardType(.decimalPad)
-                    Text("g").foregroundStyle(.secondary)
-                }
-            }
-            Section("Aporte") {
-                LabeledContent("Calorías", value: "\(fmt(macros.kcal)) kcal")
-                LabeledContent("Proteína", value: "\(fmt(macros.protein, decimals: 1)) g")
-                LabeledContent("Carbohidratos", value: "\(fmt(macros.carbs, decimals: 1)) g")
-                LabeledContent("Grasas", value: "\(fmt(macros.fat, decimals: 1)) g")
-            }
-            Section {
-                Button {
-                    onAdd(RecipeItem(name: food.name, brand: food.brand, grams: grams, macros: macros))
-                } label: { Text("Añadir a la receta").frame(maxWidth: .infinity).bold() }
-                .disabled(grams <= 0)
-            }
-        }
-        .navigationTitle("Cantidad")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-private struct ManualItemForm: View {
+struct ManualItemForm: View {
     let onSave: (RecipeItem) -> Void
     @State private var name = ""
     @State private var grams = ""
