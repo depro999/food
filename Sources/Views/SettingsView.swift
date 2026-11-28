@@ -9,6 +9,8 @@ struct SettingsView: View {
 
     @State private var apiKey = ""
     @State private var saved = false
+    @AppStorage("healthSync") private var healthSync = false
+    @State private var healthMessage: String?
 
     private var kcalFromMacros: Double { goalProtein * 4 + goalCarbs * 4 + goalFat * 9 }
 
@@ -44,6 +46,17 @@ struct SettingsView: View {
                     Text("La clave se guarda en el Llavero del dispositivo. Para publicar la app en la App Store, lo recomendable es enviar las fotos a tu propio backend y que éste llame a la API, en lugar de incluir la clave en el móvil.")
                 }
 
+                Section {
+                    Toggle("Guardar en Apple Salud", isOn: $healthSync)
+                    if let healthMessage {
+                        Text(healthMessage).font(.footnote).foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Apple Salud")
+                } footer: {
+                    Text("Guarda calorías, macros y micronutrientes (fibra, vitaminas, minerales…) de cada alimento en Salud › Nutrición. Al activarlo también se envían los registros que ya tienes. Si borras un registro, se borra también de Salud. Los micronutrientes vienen de Open Food Facts o, en las fotos, de la estimación de la IA.")
+                }
+
                 Section("Datos") {
                     LabeledContent("Base de datos de alimentos", value: "Open Food Facts")
                     Link("Contribuir a Open Food Facts",
@@ -53,6 +66,13 @@ struct SettingsView: View {
             .navigationTitle("Ajustes")
             .onAppear { apiKey = Keychain.get(AIFoodRecognizer.keychainKey) ?? "" }
             .onChange(of: apiKey) { _, _ in saved = false }
+            .onChange(of: healthSync) { _, on in
+                guard on else { healthMessage = nil; return }
+                Task {
+                    healthMessage = await HealthSync.shared.requestAuthorization()
+                    if !HealthSync.isAvailable { healthSync = false }
+                }
+            }
         }
     }
 
