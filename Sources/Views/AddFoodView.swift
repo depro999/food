@@ -1,9 +1,12 @@
 import SwiftUI
 import SwiftData
 
+/// Pantalla para añadir alimentos. Con `onPick` (modo receta) devuelve ingredientes en lugar
+/// de guardarlos en el diario, con las mismas opciones: escáner, foto con IA, código y búsqueda.
 struct AddFoodView: View {
     let date: Date
     let meal: MealType
+    let onPick: (([RecipeItem]) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -12,12 +15,24 @@ struct AddFoodView: View {
     @State private var query = ""
     @State private var results: [FoodItem] = []
     @State private var isLoading = false
+    @State private var searchError: String?
     @State private var alertMessage: String?
     @State private var showScanner = false
     @State private var showPhoto = false
     @State private var manualCode = ""
 
     private let service = OpenFoodFactsService()
+
+    init(date: Date, meal: MealType, onPick: (([RecipeItem]) -> Void)? = nil) {
+        self.date = date
+        self.meal = meal
+        self.onPick = onPick
+    }
+
+    private var pickSingle: ((RecipeItem) -> Void)? {
+        guard let onPick else { return nil }
+        return { onPick([$0]) }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -35,9 +50,19 @@ struct AddFoodView: View {
                         Button("Buscar") { Task { await lookup(manualCode) } }
                             .disabled(manualCode.count < 8)
                     }
+                    if onPick != nil {
+                        NavigationLink {
+                            ManualItemForm { item in
+                                onPick?([item])
+                                dismiss()
+                            }
+                        } label: {
+                            Label("Añadir manualmente", systemImage: "square.and.pencil")
+                        }
+                    }
                 }
 
-                if !recipes.isEmpty {
+                if onPick == nil, !recipes.isEmpty {
                     Section("Mis recetas") {
                         ForEach(recipes.filter { !$0.items.isEmpty }) { r in
                             Button {
@@ -64,6 +89,8 @@ struct AddFoodView: View {
                 Section("Resultados") {
                     if isLoading {
                         HStack { Spacer(); ProgressView(); Spacer() }
+                    } else if let searchError {
+                        Text(searchError).foregroundStyle(.red).font(.callout)
                     } else if results.isEmpty {
                         Text(query.isEmpty ? "Busca un alimento por nombre o marca." : "Sin resultados.")
                             .foregroundStyle(.secondary)
@@ -73,16 +100,29 @@ struct AddFoodView: View {
                     }
                 }
             }
-            .navigationTitle(meal.title)
+            .navigationTitle(onPick == nil ? meal.title : "Añadir ingrediente")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "Buscar alimento")
             .onSubmit(of: .search) { Task { await search() } }
+            // Búsqueda automática mientras escribes (con pausa de 0,5 s)
+            .task(id: query) {
+                let q = query.trimmingCharacters(in: .whitespaces)
+                guard q.count >= 3 else {
+                    isLoading = false
+                    if q.isEmpty { results = []; searchError = nil }
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                await search()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cerrar") { dismiss() } }
             }
             .navigationDestination(for: FoodItem.self) { item in
-                FoodDetailView(food: item, date: date, initialMeal: meal) { dismiss() }
+                FoodDetailView(food: item, date: date, initialMeal: meal,
+                               onPick: pickSingle, onSaved: { dismiss() })
             }
             .fullScreenCover(isPresented: $showScanner) {
                 ScannerScreen { payload in
@@ -95,10 +135,9 @@ struct AddFoodView: View {
                 }
             }
             .sheet(isPresented: $showPhoto) {
-                PhotoAnalysisView(date: date, meal: meal) {
-                    showPhoto = false
-                    dismiss()
-                }
+                PhotoAnalysisView(date: date, meal: meal,
+                                  onSaved: { showPhoto = false; dismiss() },
+                                  onPickItems: onPick)
             }
             .alert("Aviso", isPresented: Binding(get: { alertMessage != nil },
                                                  set: { if !$0 { alertMessage = nil } })) {
@@ -111,9 +150,20 @@ struct AddFoodView: View {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard q.count >= 2 else { return }
         isLoading = true
-        defer { isLoading = false }
-        do { results = try await service.search(q) }
-        catch { alertMessage = "No se pudo conectar con la base de datos. Revisa tu conexión." }
+        searchError = nil
+        do {
+            let found = try await service.search(q)
+            guard !Task.isCancelled else { return }
+            results = found
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
+            if let off = error as? OpenFoodFactsService.OFFError {
+                searchError = off.localizedDescription
+            } else {
+                searchError = "No se pudo completar la búsqueda. Revisa tu conexión e inténtalo de nuevo."
+            }
+        }
+        isLoading = false
     }
 
     private func lookup(_ code: String) async {
