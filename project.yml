@@ -7,27 +7,24 @@ targets:
   MacroTracker:
     type: application
     platform: iOS
-    sources:
-      - path: Sources
-        excludes:
-          - Info.plist
+    sources: [Sources]
     info:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Macros
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
-        NSCameraUsageDescription: Necesitamos la cámara para escanear códigos de barras/QR y fotografiar tus comidas.
         NSHealthUpdateUsageDescription: Guardamos tus calorías, macros y micronutrientes en Apple Salud.
-        NSHealthShareUsageDescription: Leemos tus datos de salud para sincronizar tus nutrientes.
-    entitlements:
-      path: Sources/MacroTracker.entitlements
-      properties:
-        com.apple.developer.healthkit: true
+        NSCameraUsageDescription: Necesitamos la cámara para escanear códigos de barras/QR y fotografiar tus comidas.
+    # Con cuenta de Apple Developer de pago, descomenta esto y la línea HEALTHKIT de abajo:
+    # entitlements:
+    #   path: Sources/MacroTracker.entitlements
+    #   properties:
+    #     com.apple.developer.healthkit: true
+    #     com.apple.developer.healthkit.access: []
     settings:
       base:
         SWIFT_VERSION: "5.9"
+        # SWIFT_ACTIVE_COMPILATION_CONDITIONS: HEALTHKIT
         PRODUCT_BUNDLE_IDENTIFIER: com.tuempresa.MacroTracker
         TARGETED_DEVICE_FAMILY: "1"
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
