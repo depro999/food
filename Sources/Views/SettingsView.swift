@@ -5,10 +5,7 @@ struct SettingsView: View {
     @AppStorage("goalProtein") private var goalProtein = 150.0
     @AppStorage("goalCarbs") private var goalCarbs = 250.0
     @AppStorage("goalFat") private var goalFat = 70.0
-    @AppStorage("aiModel") private var aiModel = AIFoodRecognizer.defaultModel
 
-    @State private var apiKey = ""
-    @State private var saved = false
     @AppStorage("healthSync") private var healthSync = false
     @State private var healthMessage: String?
 
@@ -28,23 +25,7 @@ struct SettingsView: View {
                         .font(.footnote)
                 }
 
-                Section {
-                    SecureField("API key de Anthropic (sk-ant-…)", text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    TextField("Modelo", text: $aiModel)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Button(saved ? "Guardada ✓" : "Guardar clave") {
-                        Keychain.set(apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
-                                     for: AIFoodRecognizer.keychainKey)
-                        saved = true
-                    }
-                } header: {
-                    Text("IA para fotos de comida")
-                } footer: {
-                    Text("La clave se guarda en el Llavero del dispositivo. Para publicar la app en la App Store, lo recomendable es enviar las fotos a tu propio backend y que éste llame a la API, en lugar de incluir la clave en el móvil.")
-                }
+                AIProvidersSection()
 
                 Section {
                     Toggle("Guardar en Apple Salud", isOn: $healthSync)
@@ -70,10 +51,8 @@ struct SettingsView: View {
             }
             .navigationTitle("Ajustes")
             .onAppear {
-                apiKey = Keychain.get(AIFoodRecognizer.keychainKey) ?? ""
                 if !HealthSync.isAvailable { healthSync = false }
             }
-            .onChange(of: apiKey) { _, _ in saved = false }
             .onChange(of: healthSync) { _, on in
                 guard on else { healthMessage = nil; return }
                 Task {
