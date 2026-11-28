@@ -18,6 +18,12 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCameraUsageDescription: Necesitamos la cámara para escanear códigos de barras/QR y fotografiar tus comidas.
+        NSHealthUpdateUsageDescription: Guardamos tus calorías, macros y micronutrientes en Apple Salud.
+        NSHealthShareUsageDescription: Leemos tus datos de salud para sincronizar tus nutrientes.
+    entitlements:
+      path: Sources/MacroTracker.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     settings:
       base:
         SWIFT_VERSION: "5.9"
