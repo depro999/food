@@ -6,8 +6,6 @@ struct SettingsView: View {
     @AppStorage("goalCarbs") private var goalCarbs = 250.0
     @AppStorage("goalFat") private var goalFat = 70.0
 
-    @AppStorage("healthSync") private var healthSync = false
-    @State private var healthMessage: String?
 
     private var kcalFromMacros: Double { goalProtein * 4 + goalCarbs * 4 + goalFat * 9 }
 
@@ -27,20 +25,12 @@ struct SettingsView: View {
 
                 AIProvidersSection()
 
-                Section {
-                    Toggle("Guardar en Apple Salud", isOn: $healthSync)
-                        .disabled(!HealthSync.isAvailable)
-                    if !HealthSync.isAvailable {
-                        Text("No disponible en esta compilación: Apple Salud exige firmar la app con la capacidad HealthKit (cuenta de Apple Developer de pago).")
-                            .font(.footnote).foregroundStyle(.secondary)
+                Section("Apple Salud") {
+                    NavigationLink {
+                        ShortcutsHelpView()
+                    } label: {
+                        Label("Pasar a Apple Salud con Atajos", systemImage: "heart.text.square")
                     }
-                    if let healthMessage {
-                        Text(healthMessage).font(.footnote).foregroundStyle(.red)
-                    }
-                } header: {
-                    Text("Apple Salud")
-                } footer: {
-                    Text("Guarda calorías, macros y micronutrientes (fibra, vitaminas, minerales…) de cada alimento en Salud › Nutrición. Al activarlo también se envían los registros que ya tienes. Si borras un registro, se borra también de Salud. Los micronutrientes vienen de Open Food Facts o, en las fotos, de la estimación de la IA.")
                 }
 
                 Section("Datos") {
@@ -50,16 +40,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Ajustes")
-            .onAppear {
-                if !HealthSync.isAvailable { healthSync = false }
-            }
-            .onChange(of: healthSync) { _, on in
-                guard on else { healthMessage = nil; return }
-                Task {
-                    healthMessage = await HealthSync.shared.requestAuthorization()
-                    if !HealthSync.isAvailable { healthSync = false }
-                }
-            }
         }
     }
 
