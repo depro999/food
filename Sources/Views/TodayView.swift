@@ -6,6 +6,18 @@ struct AddTarget: Identifiable {
     let meal: MealType
 }
 
+extension MealType {
+    /// Comida sugerida según la hora actual.
+    static var suggested: MealType {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5..<11: .breakfast
+        case 11..<16: .lunch
+        case 16..<19: .snack
+        default: .dinner
+        }
+    }
+}
+
 struct TodayView: View {
     @State private var date = Date()
     @State private var addTarget: AddTarget?
@@ -32,13 +44,8 @@ struct TodayView: View {
                         Button { shift(-1) } label: { Image(systemName: "chevron.left") }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        HStack {
-                            Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                                .disabled(Calendar.current.isDateInToday(date))
-                            Button { addTarget = AddTarget(meal: suggestedMeal) } label: {
-                                Image(systemName: "plus.circle.fill")
-                            }
-                        }
+                        Button { shift(1) } label: { Image(systemName: "chevron.right") }
+                            .disabled(Calendar.current.isDateInToday(date))
                     }
                 }
                 .sheet(item: $addTarget) { target in
@@ -47,14 +54,6 @@ struct TodayView: View {
         }
     }
 
-    private var suggestedMeal: MealType {
-        switch Calendar.current.component(.hour, from: Date()) {
-        case 5..<11: .breakfast
-        case 11..<16: .lunch
-        case 16..<19: .snack
-        default: .dinner
-        }
-    }
 }
 
 struct DayContent: View {
@@ -91,7 +90,8 @@ struct DayContent: View {
         List {
             Section {
                 SummaryCard(total: total, goalKcal: goalKcal, goalProtein: goalProtein,
-                            goalCarbs: goalCarbs, goalFat: goalFat)
+                            goalCarbs: goalCarbs, goalFat: goalFat,
+                            onTap: { onAdd(.suggested) })
             }
 
             if !pending.isEmpty {
@@ -138,7 +138,10 @@ struct DayContent: View {
                         }
                     }
                     .onDelete { offsets in
-                        for i in offsets { context.delete(items[i]) }
+                        for i in offsets {
+                            HealthSync.shared.delete(items[i])
+                            context.delete(items[i])
+                        }
                     }
                     Button { onAdd(meal) } label: {
                         Label("Añadir", systemImage: "plus.circle")
@@ -152,7 +155,8 @@ struct DayContent: View {
                             Menu {
                                 Button {
                                     draft = RecipeDraft(meal: meal, items: items.map {
-                                        RecipeItem(name: $0.name, brand: $0.brand, grams: $0.grams, macros: $0.macros)
+                                        RecipeItem(name: $0.name, brand: $0.brand, grams: $0.grams,
+                                                   macros: $0.macros, micros: $0.micros)
                                     })
                                 } label: { Label("Guardar como receta / repetir", systemImage: "repeat") }
                             } label: {
@@ -170,6 +174,8 @@ struct DayContent: View {
 struct SummaryCard: View {
     let total: Macros
     let goalKcal, goalProtein, goalCarbs, goalFat: Double
+    /// Al tocar el círculo se abre «Añadir alimento».
+    var onTap: (() -> Void)? = nil
 
     private var progress: Double { goalKcal > 0 ? min(total.kcal / goalKcal, 1) : 0 }
 
@@ -192,6 +198,14 @@ struct SummaryCard: View {
                 }
             }
             .frame(width: 160, height: 160)
+            .contentShape(Circle())
+            .onTapGesture {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onTap?()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Toca para añadir comida")
 
             VStack(spacing: 10) {
                 MacroBar(label: "Proteína", value: total.protein, goal: goalProtein, color: .red)
